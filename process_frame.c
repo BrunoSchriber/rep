@@ -11,13 +11,22 @@
 #include "template.h"
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
+
 
 #define IMG_SIZE NUM_COLORS*OSC_CAM_MAX_IMAGE_WIDTH*OSC_CAM_MAX_IMAGE_HEIGHT
 
 const int nc = OSC_CAM_MAX_IMAGE_WIDTH;
 const int nr = OSC_CAM_MAX_IMAGE_HEIGHT;
+const int Border = 1;
+
+float bgrImg[IMG_SIZE];
+const float avgFac = 0.99;
 
 int TextColor;
+void ResetProcess();
+void ProcessFrame();
+void ChangeDetection();
 
 
 void ResetProcess()
@@ -50,8 +59,35 @@ void ProcessFrame()
 		//draw filled rectangle
 		DrawBoundingBox(80, 100, 110, 120, true, BLUE);
 		DrawString(200, 200, strlen(Text), TINY, TextColor, Text);
+		ChangeDetection();
 	}
 }
+
+void ChangeDetection() {
+	int r, c;
+	//set result buffer to zero
+	memset(data.u8TempImage[THRESHOLD], 0, IMG_SIZE);
+	//loop over the rows
+	for (r = Border * nc; r < (nr - Border) * nc; r += nc) {
+		//loop over the columns
+		for (c = Border; c < (nc - Border); c++) {
+			float pImg = data.u8TempImage[SENSORIMG][r + c];
+			float pBgr = bgrImg[r + c];
+			float Dif = fabs(pImg - pBgr);
+			//if the difference is larger than threshold value
+			if (Dif > data.ipc.state.nThreshold) {
+				//set pixel value to 255 in THRESHOLD
+				data.u8TempImage[THRESHOLD][r + c] = 255;
+			}
+			// update background image
+			bgrImg[r + c] = avgFac * bgrImg[r + c]
+					+ (1 - avgFac) * (float) data.u8TempImage[SENSORIMG][r + c];
+			// set value for display
+			data.u8TempImage[BACKGROUND][r + c] = (unsigned char) bgrImg[r + c];
+		}
+	}
+}
+
 
 
 
