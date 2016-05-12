@@ -152,23 +152,72 @@ void DetectRegions() {
 	
 }
 
-void DetectAngles(){
-	
+void DetectAngle() {
+	uint16 c, o;
+	float interval[] = { 0, 22.5, 67.5, 112.5, 157.5, 180 };
+	uint16 bin[] = { 0, 0, 0, 0 };
+	char* binDesc[4] = {"0", "45", "90", "135"};
+	int i=0;
 	//loop over objects
-	for(int o = 0; o > ImgRegions.noOfObjects; o++){
-		//get pointer to root run of current object
-		struct OSC_VIS_REGIONS_RUN* currentRun = ImgRegions.objects[o].root;
-		//loop over runs of current object
-		do{
-			//loop over pixel of current run
-			for(uint16 c = currentRun->startColumn; c <= currentRun->endColumn; c++){
-				uint16 r = currentRun->row;
-				//processing for individual pixel at row r and column c
-				double angle = M_PI * atan2(imgDy[r*nc+c], imgDx[r*nc+c]);
+	for (o = 0; o < ImgRegions.noOfObjects; o++) {
+		if (ImgRegions.objects[o].area > MinArea) {
+			bin[0]=0;
+			bin[1]=0;
+			bin[2]=0;
+			bin[3]=0;
+			//get pointer to root run of current object
+			struct OSC_VIS_REGIONS_RUN* currentRun = ImgRegions.objects[o].root;
+			//loop over runs of current object
+			do {
+				//loop over pixel of current run
+				for (c = currentRun->startColumn; c <= currentRun->endColumn;
+						c++) {
+					int r = currentRun->row;
+					//processing for individual pixel at row r and column c
+					double angle = atan2(imgDy[r * nc + c], imgDx[r * nc + c]);
+
+					if (angle < 0)
+						angle += M_PI;
+					if (angle > 3.14 || angle < 0.1)
+						angle = 0;
+					if (angle != 0) {
+						angle *= 57.2957;
+						if (angle < interval[1]) {
+							bin[0] += 1;
+						} else if (angle < interval[2]) {
+							bin[1] += 1;
+						} else if (angle < interval[3]) {
+							bin[2] += 1;
+						} else if (angle < interval[4]) {
+							bin[3] += 1;
+						} else if (angle < interval[5]) {
+							bin[0] += 1;
+						}
+					}
+				}
+				currentRun = currentRun->next; //get net run of current object
+			} while (currentRun != NULL); //end of current object
+
+			int max = 0;
+			int maxIndex = 0;
+			for (i = 0; i < sizeof(bin); i++) {
+				if (bin[i] >= max) {
+					max = bin[i];
+					maxIndex = i;
+				}
 			}
-			currentRun = currentRun->next; // get next run of current object
-		} while(currentRun != NULL); //end of current object		
+			
+			uint16 drawPointY = (ImgRegions.objects[o].bboxBottom
+					- ImgRegions.objects[o].bboxTop) / 2
+					+ ImgRegions.objects[o].bboxTop;
+			uint16 drawPointX = (ImgRegions.objects[o].bboxRight
+					- ImgRegions.objects[o].bboxLeft) / 2
+					+ ImgRegions.objects[o].bboxLeft;
+			DrawString(drawPointX, drawPointY, strlen(binDesc[maxIndex]), LARGE, GREEN,
+					&binDesc[maxIndex][0]);
+		}
 	}
+
 }
 
 void DrawBoundingBoxes() {
@@ -182,11 +231,11 @@ void DrawBoundingBoxes() {
 					ImgRegions.objects[o].bboxRight,
 					ImgRegions.objects[o].bboxBottom, false, GREEN);
 			//evaluate center of object		
-			uint16 drawPointX = (int16)((ImgRegions.objects[o].bboxRight - ImgRegions.objects[o].bboxLeft) / 2) + ImgRegions.objects[o].bboxLeft;
-			uint16 drawPointY = (int16)((ImgRegions.objects[o].bboxBottom - ImgRegions.objects[o].bboxTop) / 2) + ImgRegions.objects[o].bboxTop;	
+			//uint16 drawPointX = (int16)((ImgRegions.objects[o].bboxRight - ImgRegions.objects[o].bboxLeft) / 2) + ImgRegions.objects[o].bboxLeft;
+			//uint16 drawPointY = (int16)((ImgRegions.objects[o].bboxBottom - ImgRegions.objects[o].bboxTop) / 2) + ImgRegions.objects[o].bboxTop;	
 
 			//draw text in center of object
-			DrawString(drawPointX, drawPointY, strlen(text), LARGE, BLUE, text);	
+			//DrawString(drawPointX, drawPointY, strlen(text), LARGE, BLUE, text);	
 
 		}
 	}
