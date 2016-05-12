@@ -185,6 +185,7 @@ void DetectAngle() {
 					double angle = atan2(imgDy[r * nc + c], imgDx[r * nc + c]);
 
 					if (angle < 0)
+						//use pi of math.h
 						angle += M_PI;
 					if (angle > 3.14 || angle < 0.1)
 						angle = 0;
