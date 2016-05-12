@@ -18,6 +18,9 @@
 const int nc = OSC_CAM_MAX_IMAGE_WIDTH;
 const int nr = OSC_CAM_MAX_IMAGE_HEIGHT;
 
+int16 imgDx[IMG_SIZE];
+int16 imgDy[IMG_SIZE];
+
 int TextColor;
 
 float bgrImg[IMG_SIZE];
@@ -35,66 +38,64 @@ const int MinArea = 500;
 
 struct OSC_VIS_REGIONS ImgRegions;/* these contain the foreground objects */
 
-int16 imgDx[IMG_SIZE];
-int16 imgDy[IMG_SIZE];
-
 void ChangeDetection();
 void Erode_3x3(int InIndex, int OutIndex);
 void Dilate_3x3(int InIndex, int OutIndex);
 void DetectRegions();
 void DrawBoundingBoxes();
-void DetectAngles();
+void DetectAngle(void);
+
 void ResetProcess() {
 
 }
 
 void ProcessFrame() {
+
 	//initialize counters
 	if (data.ipc.state.nStepCounter == 1) {
 
 	} else {
-
 		ChangeDetection();
 
 		Erode_3x3(THRESHOLD, INDEX0);
 		Dilate_3x3(INDEX0, THRESHOLD);
 
-		DrawBoundingBoxes();
 		DetectRegions();
+
+		DrawBoundingBoxes();
+
+		DetectAngle();
 	}
 }
 
 void ChangeDetection() {
 	int r, c;
-	//set result buffer to zero
+//set result buffer to zero
 	memset(data.u8TempImage[THRESHOLD], 0, IMG_SIZE);
-
-	//loop over the rows
+//loop over the rows
 	for (r = Border * nc; r < (nr - Border) * nc; r += nc) {
-		//loop over the columns
+//loop over the columns
 		for (c = Border; c < (nc - Border); c++) {
 			unsigned char* p = &data.u8TempImage[SENSORIMG][r + c];
 			/* implement Sobel filter in x-direction */
 			int32 dx = -(int32) *(p - nc - 1) + (int32) *(p - nc + 1)
 					- 2 * (int32) *(p - 1) + 2 * (int32) *(p + 1)
 					- (int32) *(p + nc - 1) + (int32) *(p + nc + 1);
-
-			/* implement Sobel filter in y-direction */
 			int32 dy = -(int32) *(p - nc - 1) - 2 * (int32) *(p - nc)
-								- (int32) *(p - nc + 1) + (int32) *(p + nc - 1)
-								+ 2 * (int32) *(p + nc - 1) + (int32) *(p + nc + 1);
+					- (int32) *(p - nc + 1) + (int32) *(p + nc - 1)
+					+ 2 * (int32) *(p + nc) + (int32) *(p + nc + 1);
 			/* check if norm is larger than threshold */
 			int32 df2 = dx * dx + dy * dy;
-			/* save processor time using the square of the threashold */
 			int32 thr2 = data.ipc.state.nThreshold * data.ipc.state.nThreshold;
 			if (df2 > thr2) { //avoid square root
-				//set pixel value to 255 in THRESHOLD image for gui
+
+//set pixel value to 255 in THRESHOLD image for gui
 				data.u8TempImage[THRESHOLD][r + c] = 255;
 			}
-			//store derivatives (int16 is enough)
+//store derivatives (int16 is enough)
 			imgDx[r + c] = (int16) dx;
 			imgDy[r + c] = (int16) dy;
-			//possibility to visualize data
+//possibility to visualize data
 			data.u8TempImage[BACKGROUND][r + c] = (uint8) MAX(0,
 					MIN(255, 128+dx));
 		}
@@ -145,7 +146,18 @@ void DetectRegions() {
 	//now do region labeling and feature extraction
 	OscVisLabelBinary(&Pic, &ImgRegions);
 	OscVisGetRegionProperties(&ImgRegions);
-	
+}
+
+void DrawBoundingBoxes() {
+	uint16 o;
+	for (o = 0; o < ImgRegions.noOfObjects; o++) {
+		if (ImgRegions.objects[o].area > MinArea) {
+			DrawBoundingBox(ImgRegions.objects[o].bboxLeft,
+					ImgRegions.objects[o].bboxTop,
+					ImgRegions.objects[o].bboxRight,
+					ImgRegions.objects[o].bboxBottom, false, GREEN);
+		}
+	}
 }
 
 void DetectAngle() {
@@ -202,37 +214,17 @@ void DetectAngle() {
 					maxIndex = i;
 				}
 			}
-			
-			uint16 drawPointY = (ImgRegions.objects[o].bboxBottom
+			//char* output = strcat((char*)binDesc[maxIndex][0], " deg");
+			uint16 yPos = (ImgRegions.objects[o].bboxBottom
 					- ImgRegions.objects[o].bboxTop) / 2
 					+ ImgRegions.objects[o].bboxTop;
-			uint16 drawPointX = (ImgRegions.objects[o].bboxRight
+			uint16 xPos = (ImgRegions.objects[o].bboxRight
 					- ImgRegions.objects[o].bboxLeft) / 2
 					+ ImgRegions.objects[o].bboxLeft;
-			DrawString(drawPointX, drawPointY, strlen(binDesc[maxIndex]), LARGE, GREEN,
+			DrawString(xPos, yPos, strlen(binDesc[maxIndex]), LARGE, BLUE,
 					&binDesc[maxIndex][0]);
 		}
+
 	}
 
-}
-
-void DrawBoundingBoxes() {
-	uint16 o;
-	//just needed while development
-	char* text = "hallo";
-	for (o = 0; o < ImgRegions.noOfObjects; o++) {
-		if (ImgRegions.objects[o].area > MinArea) {
-			DrawBoundingBox(ImgRegions.objects[o].bboxLeft,
-					ImgRegions.objects[o].bboxTop,
-					ImgRegions.objects[o].bboxRight,
-					ImgRegions.objects[o].bboxBottom, false, GREEN);
-			//evaluate center of object		
-			//uint16 drawPointX = (int16)((ImgRegions.objects[o].bboxRight - ImgRegions.objects[o].bboxLeft) / 2) + ImgRegions.objects[o].bboxLeft;
-			//uint16 drawPointY = (int16)((ImgRegions.objects[o].bboxBottom - ImgRegions.objects[o].bboxTop) / 2) + ImgRegions.objects[o].bboxTop;	
-
-			//draw text in center of object
-			//DrawString(drawPointX, drawPointY, strlen(text), LARGE, BLUE, text);	
-
-		}
-	}
 }
