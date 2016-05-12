@@ -43,7 +43,7 @@ void Erode_3x3(int InIndex, int OutIndex);
 void Dilate_3x3(int InIndex, int OutIndex);
 void DetectRegions();
 void DrawBoundingBoxes();
-
+void DetectAngles();
 void ResetProcess() {
 
 }
@@ -62,6 +62,9 @@ void ProcessFrame() {
 		DetectRegions();
 
 		DrawBoundingBoxes();
+		//DetectAngles();
+		/*char* demoText = "Demo";
+		DrawString(100, 100, strlen(demoText), LARGE, BLUE, demoText);*/
 	}
 }
 
@@ -80,13 +83,13 @@ void ChangeDetection() {
 					- 2 * (int32) *(p - 1) + 2 * (int32) *(p + 1)
 					- (int32) *(p + nc - 1) + (int32) *(p + nc + 1);
 
-			/*int32 dy = 0;*/
-
+			/* implement Sobel filter in y-direction */
 			int32 dy = -(int32) *(p - nc - 1) - 2 * (int32) *(p - nc)
 								- (int32) *(p - nc + 1) + (int32) *(p + nc - 1)
 								+ 2 * (int32) *(p + nc - 1) + (int32) *(p + nc + 1);
 			/* check if norm is larger than threshold */
 			int32 df2 = dx * dx + dy * dy;
+			/* save processor time using the square of the threashold */
 			int32 thr2 = data.ipc.state.nThreshold * data.ipc.state.nThreshold;
 			if (df2 > thr2) { //avoid square root
 				//set pixel value to 255 in THRESHOLD image for gui
@@ -146,16 +149,45 @@ void DetectRegions() {
 	//now do region labeling and feature extraction
 	OscVisLabelBinary(&Pic, &ImgRegions);
 	OscVisGetRegionProperties(&ImgRegions);
+	
+}
+
+void DetectAngles(){
+	
+	//loop over objects
+	for(int o = 0; o > ImgRegions.noOfObjects; o++){
+		//get pointer to root run of current object
+		struct OSC_VIS_REGIONS_RUN* currentRun = ImgRegions.objects[o].root;
+		//loop over runs of current object
+		do{
+			//loop over pixel of current run
+			for(uint16 c = currentRun->startColumn; c <= currentRun->endColumn; c++){
+				uint16 r = currentRun->row;
+				//processing for individual pixel at row r and column c
+				double angle = M_PI * atan2(imgDy[r*nc+c], imgDx[r*nc+c]);
+			}
+			currentRun = currentRun->next; // get next run of current object
+		} while(currentRun != NULL); //end of current object		
+	}
 }
 
 void DrawBoundingBoxes() {
 	uint16 o;
+	//just needed while development
+	char* text = "hallo";
 	for (o = 0; o < ImgRegions.noOfObjects; o++) {
 		if (ImgRegions.objects[o].area > MinArea) {
 			DrawBoundingBox(ImgRegions.objects[o].bboxLeft,
 					ImgRegions.objects[o].bboxTop,
 					ImgRegions.objects[o].bboxRight,
 					ImgRegions.objects[o].bboxBottom, false, GREEN);
+			//evaluate center of object		
+			uint16 drawPointX = (int16)((ImgRegions.objects[o].bboxRight - ImgRegions.objects[o].bboxLeft) / 2) + ImgRegions.objects[o].bboxLeft;
+			uint16 drawPointY = (int16)((ImgRegions.objects[o].bboxBottom - ImgRegions.objects[o].bboxTop) / 2) + ImgRegions.objects[o].bboxTop;	
+
+			//draw text in center of object
+			DrawString(drawPointX, drawPointY, strlen(text), LARGE, BLUE, text);	
+
 		}
 	}
 }
