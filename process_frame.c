@@ -59,12 +59,8 @@ void ProcessFrame() {
 		Erode_3x3(THRESHOLD, INDEX0);
 		Dilate_3x3(INDEX0, THRESHOLD);
 
-		DetectRegions();
-
 		DrawBoundingBoxes();
-		//DetectAngles();
-		/*char* demoText = "Demo";
-		DrawString(100, 100, strlen(demoText), LARGE, BLUE, demoText);*/
+		DetectRegions();
 	}
 }
 
